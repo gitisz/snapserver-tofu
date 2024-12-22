@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: snapserver
+  namespace: snapserver
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: snapserver
+  template:
+    metadata:
+      labels:
+        app: snapserver
+    spec:
+      imagePullSecrets:
+        - name: docker-registry-credentials
+      containers:
+        - name: snapserver
+          image: ${snapserver_image}
+          ports:
+            - containerPort: 1704
+            - containerPort: 1705
+            - containerPort: 1780%{ for port in additional_ports }
+            - containerPort: ${port}%{ endfor }
+          volumeMounts:
+            - name: snapserver-fifo
+              mountPath: /tmp/snapcast
+            - name: snapserver-config
+              mountPath: /etc/snapserver.conf
+              subPath: snapserver.conf%{ for spotify_user in spotify_users }
+            - name: snapserver-${spotify_user.name}
+              mountPath: /snapserver/${spotify_user.name}%{ endfor }%{ for spotify_user in spotify_users }
+            - name: ${spotify_user.name}-spotify-secret
+              mountPath: /snapserver/${spotify_user.name}/credentials.json
+              subPath: credentials.json%{ endfor }
+      volumes:
+        - name: snapserver-fifo
+          emptyDir: {}
+        - name: snapserver-config
+          configMap:
+            name: snapserver-config%{ for spotify_user in spotify_users }
+        - name: snapserver-${spotify_user.name}
+          persistentVolumeClaim:
+            claimName: snapserver-${spotify_user.name}%{ endfor }%{ for spotify_user in spotify_users }
+        - name: ${spotify_user.name}-spotify-secret
+          secret:
+            secretName: ${spotify_user.name}-spotify-secret%{ endfor }
