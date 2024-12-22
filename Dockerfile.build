@@ -1,0 +1,94 @@
+FROM rust:latest AS rust-builder
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libssl-dev \
+    pkg-config \
+    libasound2-dev \
+    git \
+    curl \
+    && apt-get clean
+WORKDIR /librespot
+RUN git clone https://github.com/librespot-org/librespot.git /librespot
+RUN git checkout v0.4.2
+RUN cargo build --release
+
+
+
+FROM mcr.microsoft.com/devcontainers/cpp:1-debian-11 AS debian-builder
+ARG SNAPCAST_BRANCH="release"
+ARG BOOST_VERSION="1.87.0"
+ARG BOOST_VERSION_UNDERSCORE="${BOOST_VERSION//./_}"
+RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
+    && apt-get -y install --no-install-recommends \
+    build-essential \
+    cmake \
+    git \
+    libasound2-dev \
+    libpulse-dev \
+    libvorbisidec-dev \
+    libvorbis-dev \
+    libopus-dev \
+    libflac-dev \
+    libsoxr-dev \
+    alsa-utils \
+    libavahi-client-dev \
+    avahi-daemon \
+    libexpat1-dev \
+    libboost-dev \
+    cmake-format \
+    ccache
+
+# WORKDIR /boost
+# RUN if [ "$SNAPCAST_BRANCH" != "release" ]; then \
+#     echo "Downloading and extracting Boost ${BOOST_VERSION}..."; \
+#     wget https://boostorg.jfrog.io/artifactory/main/release/${BOOST_VERSION}/source/boost_${BOOST_VERSION_UNDERSCORE}.tar.gz \
+#     && tar -xzf boost_${BOOST_VERSION_UNDERSCORE}.tar.gz; \
+#     fi
+
+WORKDIR /snapcast
+RUN git clone https://github.com/badaix/snapcast.git /snapcast
+RUN git checkout "$SNAPCAST_BRANCH" \
+    && mkdir build \
+    && cd build \
+    && cmake .. \
+    && cmake --build .
+RUN ls -la /snapcast/bin/
+
+FROM debian:latest
+LABEL maintainer="me"
+ARG SNAPCAST_VERSION="0.29.0"
+ARG SNAPCAST_BUILD="-1"
+ARG TARGETARCH
+ARG SNAPCAST_BRANCH="release"
+RUN apt-get update \
+    && apt-get install -y \
+    libasound2-dev \
+    libpulse-dev \
+    libvorbisidec-dev \
+    libvorbis-dev \
+    libopus-dev \
+    libflac-dev \
+    alsa-utils \
+    libavahi-client-dev \
+    avahi-daemon \
+    libexpat1-dev \
+    wget \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+
+RUN wget https://github.com/badaix/snapcast/releases/download/v${SNAPCAST_VERSION}/snapserver_${SNAPCAST_VERSION}${SNAPCAST_BUILD}_${TARGETARCH}_bookworm.deb
+RUN dpkg -i snapserver_${SNAPCAST_VERSION}${SNAPCAST_BUILD}_${TARGETARCH}_bookworm.deb; \
+    apt-get update \
+    && apt-get -f install -y \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=rust-builder /librespot/target/release/librespot /usr/local/bin/
+COPY --from=debian-builder /snapcast/bin/snapserver /usr/bin/
+RUN find / -iname *libcrypto*
+RUN ln -s /usr/lib/x86_64-linux-gnu/libFLAC.so.12 /usr/lib/x86_64-linux-gnu/libFLAC.so.8
+
+
+RUN snapserver -v
+EXPOSE 1704 1705 1780
+ENTRYPOINT ["snapserver"]

@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: snapserver-config
+  namespace: snapserver
+data:
+  snapserver.conf: |
+    ###############################################################################
+    #     ______                                                                  #
+    #    / _____)                                                                 #
+    #   ( (____   ____   _____  ____    ___  _____   ____  _   _  _____   ____    #
+    #    \____ \ |  _ \ (____ ||  _ \  /___)| ___ | / ___)| | | || ___ | / ___)   #
+    #    _____) )| | | |/ ___ || |_| ||___ || ____|| |     \ V / | ____|| |       #
+    #   (______/ |_| |_|\_____||  __/ (___/ |_____)|_|      \_/  |_____)|_|       #
+    #                          |_|                                                #
+    #                                                                             #
+    #  Snapserver config file                                                     #
+    #                                                                             #
+    ###############################################################################
+
+    [server]
+
+    [http]
+    doc_root = /usr/share/snapserver/snapweb
+    host = ${snapserver_host}
+
+    [tcp]
+
+    [stream]%{ for config_entry in snapserver_config_entries }
+    ${config_entry}%{ endfor }
+
+    [logging]
+    filter = *:debug

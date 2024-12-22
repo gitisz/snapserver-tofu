@@ -1,0 +1,19 @@
+services:
+  snapserver-direct:
+    image: my-private-registry/snapserver:0.29.0-1
+    container_name: snapserver
+    hostname: snapserver
+    restart: always
+    environment:
+      - TZ=America/NewYork
+    volumes:
+      - fifo:/tmp/snapcast
+      - ./:/snapserver/my-secret
+      - /var/snapserver/snapserver.conf:/etc/snapserver.conf:ro,z
+    ports:
+      - "1704:1704"
+      - "1705:1705"
+      - "1780:1780"
+
+volumes:
+  fifo:
