@@ -15,7 +15,8 @@ RUN cargo build --release
 
 
 FROM debian:latest
-LABEL maintainer="ISZLAND"
+ARG MAINTAINER="ISZ"
+LABEL maintainer="${MAINTAINER}"
 ARG SNAPCAST_VERSION="0.29.0"
 ARG SNAPCAST_BUILD="-1"
 ARG TARGETARCH
